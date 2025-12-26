@@ -1,40 +1,15 @@
 const express = require('express');
-const redis = require('./redisClient');
+const { getCircuitState } = require('./redisClient');
+const { pg, checkDbConnection, checkRedisDbSync } = require('./database');
 
 const app = express();
 
 app.use(express.json());
 
-const pg = require('knex')({
-  client: 'pg',
-  connection: {
-    host: 'localhost',
-    port: 5400,
-    user: 'postgres',
-    database: 'circuitBreaker',
-    password: 'postgres',
-    ssl: false,
-  },
-});
+checkDbConnection()
 
-pg.raw('select 1')
-  .then(() => console.log('DB connected'))
-  .catch(() => process.exit(1));
+checkRedisDbSync('order-service', 9000)
 
-const TTL = 10; // seconds
-
-async function getCircuitState(service) {
-  const data = await redis.get(`cb:${service}`);
-  return data ? JSON.parse(data) : null;
-}
-
-async function setCircuitState(service, state) {
-  await redis.set(
-    `cb:${service}`,
-    JSON.stringify(state),
-    { EX: TTL }
-  );
-}
 
 app.get('/orders/:id', async (req, res) => {
   const { id } = req.params;
@@ -51,10 +26,7 @@ app.get('/orders/:id', async (req, res) => {
 app.post('/orders', async (req, res) => {
   const { user_id, amount } = req.body;
 
-  const service = 'user-service';
-
-  let state = await getCircuitState(service);
-  await setCircuitState(service, { is_up: state?.is_up ? state.is_up : false });
+  const state = await getCircuitState('user-service');
 
   if (state && !state.is_up) {
     return res.status(503).json({ message: 'Circuit OPEN for user-service' });

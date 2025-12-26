@@ -1,44 +1,13 @@
 const express = require('express');
-
+const { pg, checkDbConnection, checkRedisDbSync } = require('./database');
 const app = express();
 
 app.use(express.json());
 
-const pg = require('knex')({
-  client: 'pg',
-  connection: {
-    host: 'localhost',
-    port: 5400,
-    user: 'postgres',
-    database: 'circuitBreaker',
-    password: 'postgres',
-    ssl: false,
-  },
-});
+checkDbConnection();
 
-const pg_config = require('knex')({
-  client: 'pg',
-  connection: {
-    host: 'localhost',
-    port: 5401,
-    user: 'postgres',
-    database: 'circuitBreakerConfig',
-    password: 'postgres',
-    ssl: false,
-  },
-});
+checkRedisDbSync('user-service', 9000)
 
-pg.raw('select 1')
-  .then(() => { console.log('Connected db successfully') })
-  .catch(err => {
-    console.log('connection error'); process.exit(1)
-  })
-
-pg_config.raw('select 1')
-  .then(() => { console.log('Connected db-config successfully') })
-  .catch(err => {
-    console.log('connection error'); process.exit(1)
-  })
 
 app.get('/users/:id', async (req, res) => {
   const { id } = req.params;
