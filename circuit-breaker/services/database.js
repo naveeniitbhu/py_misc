@@ -1,4 +1,5 @@
 const { getCircuitState, setCircuitState } = require('./redisClient');
+const { publishCircuitEvent } = require('./redisClient');
 
 const pg = require('knex')({
   client: 'pg',
@@ -57,6 +58,7 @@ function checkRedisDbSync(service, refreshInterval) {
         await setCircuitState(service, {
           is_up: dbState
         });
+        publishCircuitEvent(service, dbState ? 'CLOSED' : 'OPEN', 'db')
       }
     } catch (err) {
       console.log('⚠️ Auto-refresh failed, keeping circuit OPEN');

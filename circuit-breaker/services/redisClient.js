@@ -3,15 +3,21 @@ const { createClient } = require('redis');
 const redis = createClient({
   url: 'redis://localhost:6379'
 });
+const subscriber = redis.duplicate();
 
-redis.connect()
-  .then(() => console.log('Redis connected'))
-  .catch(console.error);
-
+async function initRedis() {
+  await redis.connect();
+  await subscriber.connect()
+}
 
 async function getCircuitState(service) {
-  const data = await redis.get(`cb:${service}`);
-  return data ? JSON.parse(data) : null;
+  try {
+    const data = await redis.get(`cb:${service}`);
+    return data ? JSON.parse(data) : null;
+  } catch (error) {
+    console.error('Error in getCircuitState:', error);
+    return null;
+  }
 }
 
 async function setCircuitState(service, state) {
@@ -22,4 +28,8 @@ async function setCircuitState(service, state) {
   );
 }
 
-module.exports = { redis, getCircuitState, setCircuitState };
+async function publishCircuitEvent(service, state, source) {
+  await redis.publish('circuit-events', JSON.stringify({ service, state, source }))
+}
+
+module.exports = { redis, getCircuitState, setCircuitState, initRedis, subscriber, publishCircuitEvent };
